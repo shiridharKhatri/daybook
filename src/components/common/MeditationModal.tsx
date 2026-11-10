@@ -7,8 +7,10 @@ import {
   Pressable,
   Animated,
   Dimensions,
+  Platform,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { StatusBar } from 'expo-status-bar';
 import { haptic } from '../../utils/haptics';
 import { audioService } from '../../utils/audio';
 import { VolumeHighIcon, VolumeMuteIcon } from '../icons';
@@ -27,6 +29,10 @@ const CIRCLE_SIZE = width * 0.52;
 type BreathPhase = 'Inhale' | 'Hold' | 'Exhale' | 'Rest';
 
 export function MeditationModal({ visible, onClose, onSaved }: MeditationModalProps) {
+  const insets = useSafeAreaInsets();
+  const topInset = Math.max(insets.top, Platform.OS === 'ios' ? 54 : 32);
+  const bottomInset = Math.max(insets.bottom, Platform.OS === 'ios' ? 24 : 16);
+
   const [phase, setPhase] = useState<BreathPhase>('Inhale');
   const [secondsLeft, setSecondsLeft] = useState(4);
   const [cyclesCompleted, setCyclesCompleted] = useState(0);
@@ -196,11 +202,21 @@ export function MeditationModal({ visible, onClose, onSaved }: MeditationModalPr
   return (
     <Modal
       visible={visible}
-      animationType="fade"
+      animationType="slide"
       transparent={false}
+      statusBarTranslucent
       onRequestClose={handleClose}
     >
-      <SafeAreaView style={styles.container}>
+      <StatusBar style="dark" />
+      <View
+        style={[
+          styles.container,
+          {
+            paddingTop: topInset,
+            paddingBottom: bottomInset,
+          },
+        ]}
+      >
         {/* Header */}
         <View style={styles.header}>
           <Pressable onPress={handleClose} hitSlop={12} style={styles.closeBtn}>
@@ -285,7 +301,7 @@ export function MeditationModal({ visible, onClose, onSaved }: MeditationModalPr
             <Text style={styles.logButtonText}>Finish & Save Reflection</Text>
           </Pressable>
         </View>
-      </SafeAreaView>
+      </View>
     </Modal>
   );
 }
@@ -301,7 +317,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 20,
-    paddingVertical: 12,
+    paddingTop: 8,
+    paddingBottom: 16,
   },
   closeBtn: {
     paddingVertical: 6,
