@@ -50,6 +50,12 @@ Combining intentional aesthetics with high-performance mobile architecture, Dayb
 - **Daily Symptom & Mood Logging**: Record physical signs, energy levels, and hydration notes.
 - **Mind & Body Calm Audio**: Integrated soothing audio player for meditation, rest, and breathing exercises.
 
+### 🧘 Guided Breath & Harmonic Audio
+- **Mindful Breathing Visuals**: Smooth expanding and contracting circle for 4-second box breathing cycles (Inhale, Hold, Exhale, Rest).
+- **Audio On / Off Switch**: Instant sound toggle in the header to switch between focused silence or soothing auditory immersion.
+- **Harmonic Breath Cues**: Melodic chimes tuned for each phase (rising chime for Inhale, sustained shimmer for Hold, settling release for Exhale, grounding bell for Rest).
+- **Peaceful Ambient Resonance**: Gentle background crystal singing bowl soundscape.
+
 ### 🤖 Private On-Device AI Assistant
 - **Local Retrieval Assistant**: Ask questions directly about your saved notes, expenses, pending tasks, and habits.
 - **Voice Query Support**: Dictate queries directly into the search bar using the microphone.

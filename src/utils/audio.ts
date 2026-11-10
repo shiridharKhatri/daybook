@@ -109,6 +109,17 @@ async function createAudioFileFallback(durationSec = 2.5): Promise<string> {
   return '';
 }
 
+const CALM_SOUND_ASSETS: Record<string, any> = {
+  calm_chime: require('../../assets/audio/meditation_bell.mp3'),
+  meditation_bell: require('../../assets/audio/meditation_bell.mp3'),
+  ambient: require('../../assets/audio/crystal_singing_bowl.mp3'),
+  crystal_singing_bowl: require('../../assets/audio/crystal_singing_bowl.mp3'),
+  inhale: require('../../assets/audio/breath_inhale.wav'),
+  hold: require('../../assets/audio/breath_hold.wav'),
+  exhale: require('../../assets/audio/breath_exhale.wav'),
+  rest: require('../../assets/audio/breath_rest.wav'),
+};
+
 export const audioService = {
   isSupported: isNativeAudioSupported,
 
@@ -184,10 +195,18 @@ export const audioService = {
   },
 
   playAudio: async (
-    uri: string,
-    onFinish?: () => void
+    sourceInput: string | number | any,
+    onFinish?: () => void,
+    options?: { isLooping?: boolean; volume?: number }
   ): Promise<{ stop: () => Promise<void> } | null> => {
-    if (!uri) return null;
+    if (!sourceInput) return null;
+
+    let source = sourceInput;
+    if (typeof sourceInput === 'string' && CALM_SOUND_ASSETS[sourceInput]) {
+      source = CALM_SOUND_ASSETS[sourceInput];
+    } else if (typeof sourceInput === 'string') {
+      source = { uri: sourceInput };
+    }
 
     if (NativeAudio && isNativeAudioSupported) {
       try {
@@ -197,14 +216,20 @@ export const audioService = {
         });
 
         const { sound } = await NativeAudio.Sound.createAsync(
-          { uri },
-          { shouldPlay: true }
+          source,
+          {
+            shouldPlay: true,
+            isLooping: options?.isLooping ?? false,
+            volume: options?.volume ?? 1.0,
+          }
         );
 
         sound.setOnPlaybackStatusUpdate((status: any) => {
           if (status.isLoaded && status.didJustFinish) {
             onFinish?.();
-            sound.unloadAsync().catch(() => {});
+            if (!options?.isLooping) {
+              sound.unloadAsync().catch(() => {});
+            }
           }
         });
 
@@ -235,5 +260,19 @@ export const audioService = {
         clearTimeout(timer);
       },
     };
+  },
+
+  playBreathCue: async (
+    phase: 'Inhale' | 'Hold' | 'Exhale' | 'Rest'
+  ): Promise<{ stop: () => Promise<void> } | null> => {
+    const key = phase.toLowerCase();
+    return audioService.playAudio(key, undefined, { volume: 0.85 });
+  },
+
+  startMeditationAmbient: async (): Promise<{ stop: () => Promise<void> } | null> => {
+    return audioService.playAudio('ambient', undefined, {
+      isLooping: true,
+      volume: 0.35,
+    });
   },
 };

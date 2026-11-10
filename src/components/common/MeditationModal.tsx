@@ -10,6 +10,8 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { haptic } from '../../utils/haptics';
+import { audioService } from '../../utils/audio';
+import { VolumeHighIcon, VolumeMuteIcon } from '../icons';
 import { notesRepository } from '../../database/repositories';
 import { format } from 'date-fns';
 
@@ -28,14 +30,66 @@ export function MeditationModal({ visible, onClose, onSaved }: MeditationModalPr
   const [phase, setPhase] = useState<BreathPhase>('Inhale');
   const [secondsLeft, setSecondsLeft] = useState(4);
   const [cyclesCompleted, setCyclesCompleted] = useState(0);
+  const [soundEnabled, setSoundEnabled] = useState(true);
+
+  const soundEnabledRef = useRef(true);
+  soundEnabledRef.current = soundEnabled;
+
+  const ambientPlayerRef = useRef<{ stop: () => Promise<void> } | null>(null);
+  const phasePlayerRef = useRef<{ stop: () => Promise<void> } | null>(null);
 
   const scaleAnim = useRef(new Animated.Value(0.8)).current;
   const opacityAnim = useRef(new Animated.Value(0.5)).current;
   const intervalRef = useRef<any>(null);
 
+  const stopAllAudio = () => {
+    if (phasePlayerRef.current) {
+      phasePlayerRef.current.stop().catch(() => {});
+      phasePlayerRef.current = null;
+    }
+    if (ambientPlayerRef.current) {
+      ambientPlayerRef.current.stop().catch(() => {});
+      ambientPlayerRef.current = null;
+    }
+  };
+
+  const playPhaseSound = async (phaseName: BreathPhase) => {
+    if (!soundEnabledRef.current) return;
+    try {
+      if (phasePlayerRef.current) {
+        await phasePlayerRef.current.stop();
+      }
+      phasePlayerRef.current = await audioService.playBreathCue(phaseName);
+    } catch {}
+  };
+
+  const startAmbientLoop = async () => {
+    if (!soundEnabledRef.current) return;
+    try {
+      if (!ambientPlayerRef.current) {
+        ambientPlayerRef.current = await audioService.startMeditationAmbient();
+      }
+    } catch {}
+  };
+
+  const toggleSound = () => {
+    haptic.selection();
+    const nextVal = !soundEnabled;
+    setSoundEnabled(nextVal);
+    soundEnabledRef.current = nextVal;
+
+    if (nextVal) {
+      startAmbientLoop();
+      playPhaseSound(phase);
+    } else {
+      stopAllAudio();
+    }
+  };
+
   useEffect(() => {
     if (!visible) {
       if (intervalRef.current) clearInterval(intervalRef.current);
+      stopAllAudio();
       setPhase('Inhale');
       setSecondsLeft(4);
       setCyclesCompleted(0);
@@ -45,6 +99,12 @@ export function MeditationModal({ visible, onClose, onSaved }: MeditationModalPr
     haptic.impact();
     let currentPhase: BreathPhase = 'Inhale';
     let count = 4;
+
+    // Start peaceful ambient sound and initial inhale chime if audio is enabled
+    if (soundEnabledRef.current) {
+      startAmbientLoop();
+      playPhaseSound('Inhale');
+    }
 
     const animatePhase = (nextPhase: BreathPhase) => {
       if (nextPhase === 'Inhale') {
@@ -99,16 +159,21 @@ export function MeditationModal({ visible, onClose, onSaved }: MeditationModalPr
           haptic.impact();
         }
         setPhase(currentPhase);
+        if (soundEnabledRef.current) {
+          playPhaseSound(currentPhase);
+        }
       }
       setSecondsLeft(count);
     }, 1000);
 
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current);
+      stopAllAudio();
     };
   }, [visible]);
 
   const handleFinishAndSave = () => {
+    stopAllAudio();
     haptic.impact();
     const timeStr = format(new Date(), 'h:mm a');
     const dateStr = format(new Date(), 'MMMM d, yyyy');
@@ -121,6 +186,11 @@ export function MeditationModal({ visible, onClose, onSaved }: MeditationModalPr
     onClose();
   };
 
+  const handleClose = () => {
+    stopAllAudio();
+    onClose();
+  };
+
   if (!visible) return null;
 
   return (
@@ -128,16 +198,40 @@ export function MeditationModal({ visible, onClose, onSaved }: MeditationModalPr
       visible={visible}
       animationType="fade"
       transparent={false}
-      onRequestClose={onClose}
+      onRequestClose={handleClose}
     >
       <SafeAreaView style={styles.container}>
         {/* Header */}
         <View style={styles.header}>
-          <Pressable onPress={onClose} hitSlop={12} style={styles.closeBtn}>
+          <Pressable onPress={handleClose} hitSlop={12} style={styles.closeBtn}>
             <Text style={styles.closeBtnText}>Done</Text>
           </Pressable>
           <Text style={styles.headerTitle}>Guided Breath</Text>
-          <View style={{ width: 44 }} />
+
+          {/* Audio On / Off Toggle Pill */}
+          <Pressable
+            onPress={toggleSound}
+            hitSlop={10}
+            style={({ pressed }) => [
+              styles.soundTogglePill,
+              soundEnabled && styles.soundTogglePillActive,
+              pressed && { opacity: 0.8, transform: [{ scale: 0.96 }] },
+            ]}
+            accessibilityRole="button"
+            accessibilityLabel={soundEnabled ? 'Mute mindful audio' : 'Enable mindful audio'}
+          >
+            {soundEnabled ? (
+              <>
+                <VolumeHighIcon size={15} color="#C58882" strokeWidth={2.2} />
+                <Text style={styles.soundToggleTextActive}>Sound On</Text>
+              </>
+            ) : (
+              <>
+                <VolumeMuteIcon size={15} color="#88827E" strokeWidth={2} />
+                <Text style={styles.soundToggleTextMuted}>Sound Off</Text>
+              </>
+            )}
+          </Pressable>
         </View>
 
         {/* Content */}
@@ -168,6 +262,15 @@ export function MeditationModal({ visible, onClose, onSaved }: MeditationModalPr
             {phase === 'Exhale' && 'Slowly release through your mouth...'}
             {phase === 'Rest' && 'Pause in stillness before the next breath...'}
           </Text>
+
+          {/* Gentle Audio Indicator Badge */}
+          <View style={styles.audioStatusBadge}>
+            <Text style={styles.audioStatusText}>
+              {soundEnabled
+                ? 'Harmonic breath cues & singing bowl active'
+                : 'Audio muted - Tap Sound On above for breath chimes'}
+            </Text>
+          </View>
         </View>
 
         {/* Footer */}
@@ -213,6 +316,31 @@ const styles = StyleSheet.create({
     fontSize: 17,
     fontWeight: '700',
     color: '#34312F',
+  },
+  soundTogglePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 20,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#EFEAE4',
+  },
+  soundTogglePillActive: {
+    backgroundColor: '#FAF0EB',
+    borderColor: '#F0E2DA',
+  },
+  soundToggleTextActive: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#C58882',
+  },
+  soundToggleTextMuted: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#88827E',
   },
   centerWrap: {
     alignItems: 'center',
@@ -263,6 +391,19 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontStyle: 'italic',
     minHeight: 24,
+  },
+  audioStatusBadge: {
+    marginTop: 18,
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 14,
+    backgroundColor: '#F3EFEA',
+  },
+  audioStatusText: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: '#88827E',
+    textAlign: 'center',
   },
   footer: {
     paddingHorizontal: 24,

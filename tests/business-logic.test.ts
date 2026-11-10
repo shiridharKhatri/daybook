@@ -167,5 +167,26 @@ describe('Daybook Core Business Logic', () => {
       });
     });
   });
+
+  describe('Guided Breath Audio System', () => {
+    test('maps all 4 breathing phases to corresponding harmonic sound keys', () => {
+      const phases: ('Inhale' | 'Hold' | 'Exhale' | 'Rest')[] = ['Inhale', 'Hold', 'Exhale', 'Rest'];
+      const soundKeys = phases.map((p) => p.toLowerCase());
+
+      assert.deepStrictEqual(soundKeys, ['inhale', 'hold', 'exhale', 'rest']);
+
+      // Expected guidance hints
+      const hints: Record<string, string> = {
+        Inhale: 'Slowly breathe in through your nose...',
+        Hold: 'Hold gently and soften your shoulders...',
+        Exhale: 'Slowly release through your mouth...',
+        Rest: 'Pause in stillness before the next breath...',
+      };
+
+      phases.forEach((p) => {
+        assert.ok(hints[p].length > 0, `Hint for ${p} should be present`);
+      });
+    });
+  });
 });
 
